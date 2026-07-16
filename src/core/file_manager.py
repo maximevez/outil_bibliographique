@@ -42,12 +42,39 @@ class FileManager:
         return True
         
     def _create_markdown_from_template(self, destination: Path):
+        """Utilise le template s'il existe, sinon crée un Markdown structuré."""
         template_file = self.templates_path / "template_note.md"
+        
+        # Le nouveau plan pré-écrit avec bloc LaTeX
+        contenu_par_defaut = f"""# {destination.stem}
+
+        ## Mots-clés
+        **FR :** 
+        **EN :** 
+
+        ## Résumé
+
+
+        ## Informations importantes
+        - 
+        - 
+
+        ## Citer l'article (BibTeX / LaTeX)
+        ```latex
+        @article{{cle_citation,
+        title={{{destination.stem}}},
+        author={{Nom_Auteur, Initiale.}},
+        journal={{Nom_du_Journal}},
+        year={{Année}}
+        }}
+        """
+
         if template_file.exists():
             shutil.copy2(template_file, destination)
         else:
+            # Si le fichier physique template_note.md n'existe pas, on injecte ce contenu
             with open(destination, "w", encoding="utf-8") as f:
-                f.write(f"# {destination.stem}\n\n## Résumé\n\n## Méthodologie\n\n## Formules Clés\n")
+                f.write(contenu_par_defaut)
 
     def rename_item(self, target_path: str, new_name: str) -> bool:
         """Renomme un dossier ou un fichier (et son Markdown associé)."""
