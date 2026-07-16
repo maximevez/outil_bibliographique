@@ -5,6 +5,10 @@ from pathlib import Path
 from src.core.launcher import Launcher
 import markdown
 from tkinterweb import HtmlFrame
+import os
+import zipfile
+import time
+from zipfile import ZipInfo
 
 class ApplicationUI:
     def __init__(self, root, file_mgr, git_mgr, biblio_path):
@@ -87,6 +91,9 @@ class ApplicationUI:
         ctk.CTkButton(action_frame, text="➡️ Déplacer", command=self.deplacer_element).grid(row=1, column=1, padx=5, pady=5, sticky="ew")
         action_frame.grid_columnconfigure(0, weight=1)
         action_frame.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkButton(action_frame, text="📥 Importer ZIP", command=self.importer_bibliotheque, fg_color="#2fa572", hover_color="#25855a").grid(row=2, column=0, padx=5, pady=5, sticky="ew")
+        ctk.CTkButton(action_frame, text="📦 Exporter ZIP", command=self.exporter_bibliotheque, fg_color="#a55a1f", hover_color="#874918").grid(row=2, column=1, padx=5, pady=5, sticky="ew")
 
     def _creer_panneau_droit(self):
         self.right_frame = ctk.CTkFrame(self.root, corner_radius=10)
@@ -319,3 +326,73 @@ class ApplicationUI:
     def annuler_recherche(self):
         self.search_var.set("")
         self.rafraichir_liste()
+    
+    # === IMPORT / EXPORT ===
+    def exporter_bibliotheque(self):
+        chemin_zip = filedialog.asksaveasfilename(
+            defaultextension=".zip",
+            filetypes=[("Fichiers ZIP", "*.zip")],
+            title="Exporter ma bibliothèque",
+            initialfile="Ma_Bibliotheque_Export.zip"
+        )
+        if not chemin_zip:
+            return
+
+        articles_dir = self.biblio_path / "articles"
+        
+        try:
+            with zipfile.ZipFile(chemin_zip, 'w', zipfile.ZIP_DEFLATED, strict_timestamps=False) as zipf:
+                for root, dirs, files in os.walk(articles_dir):
+                    # L'ASTUCE : Si on trouve le fichier marqueur, on ordonne à Python d'ignorer ce dossier !
+                    if ".ignore_export" in files:
+                        dirs[:] = []  # Vide la liste des sous-dossiers pour stopper os.walk() ici
+                        continue
+                        
+                    for file in files:
+                        file_path = Path(root) / file
+                        # arcname permet de garder l'arborescence propre à l'intérieur du ZIP
+                        arcname = file_path.relative_to(articles_dir)
+                        zipf.write(file_path, arcname)
+                        
+            messagebox.showinfo("Succès", "Votre bibliothèque a été exportée !\n\nLes dossiers importés d'autres collègues ont bien été exclus du ZIP.")
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Erreur lors de l'exportation : {e}")
+
+    def importer_bibliotheque(self):
+        chemin_zip = filedialog.askopenfilename(
+            title="Sélectionner une bibliothèque partagée (ZIP)",
+            filetypes=[("Fichiers ZIP", "*.zip")]
+        )
+        if not chemin_zip:
+            return
+
+        nom_dossier = simpledialog.askstring("Importation", "Nom du dossier pour cette bibliothèque :\n(ex: Biblio de Sophie)")
+        if not nom_dossier:
+            return
+
+        # Nettoyer un peu le nom du dossier pour éviter les bugs Windows
+        nom_dossier = "".join([c for c in nom_dossier if c.isalpha() or c.isdigit() or c in ' -_']).strip()
+        if not nom_dossier:
+            return
+            
+        dossier_import = self.biblio_path / "articles" / nom_dossier
+        
+        if dossier_import.exists():
+            messagebox.showerror("Erreur", f"Le dossier '{nom_dossier}' existe déjà. Veuillez choisir un autre nom.")
+            return
+            
+        try:
+            dossier_import.mkdir(parents=True)
+            
+            # C'est ici que ça change : on utilise 'r' pour LIRE le zip !
+            with zipfile.ZipFile(chemin_zip, 'r') as zipf:
+                zipf.extractall(dossier_import)
+                
+            # Création du fichier marqueur caché pour protéger contre le ré-export
+            with open(dossier_import / ".ignore_export", "w", encoding="utf-8") as f:
+                f.write("Dossier importé. Ne pas ré-exporter.")
+                
+            self.rafraichir_liste()
+            messagebox.showinfo("Succès", f"La bibliothèque a été importée avec succès dans le dossier '{nom_dossier}'.")
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Erreur lors de l'importation : {e}")
