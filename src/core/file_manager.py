@@ -49,26 +49,25 @@ class FileManager:
         # Le nouveau plan pré-écrit avec bloc LaTeX
         contenu_par_defaut = f"""# {destination.stem}
 
-        ## Mots-clés
-        **FR :** 
-        **EN :** 
+## Mots-clés
+**FR :** 
+**EN :** 
 
-        ## Résumé
+## Résumé
 
+## Informations importantes
+- 
+- 
 
-        ## Informations importantes
-        - 
-        - 
-
-        ## Citer l'article (BibTeX / LaTeX)
-        ```latex
-        @article{{cle_citation,
-        title={{{destination.stem}}},
-        author={{Nom_Auteur, Initiale.}},
-        journal={{Nom_du_Journal}},
-        year={{Année}}
-        }}
-        """
+## Citer l'article (BibTeX / LaTeX)
+```latex
+@article{{cle_citation,
+title={{{destination.stem}}},
+author={{Nom_Auteur, Initiale.}},
+journal={{Nom_du_Journal}},
+year={{Année}}
+}}
+"""
 
         if template_file.exists():
             shutil.copy2(template_file, destination)
