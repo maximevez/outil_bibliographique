@@ -1,0 +1,2 @@
+Pour generer un .exe : 
+pyinstaller --noconsole --onefile --name "Outil_Bibliographique" --icon="assets/logo.ico" main.py

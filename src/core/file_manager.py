@@ -51,6 +51,7 @@ class FileManager:
 
 ## Mots-clés
 **FR :** 
+
 **EN :** 
 
 ## Résumé
@@ -62,11 +63,11 @@ class FileManager:
 ## Citer l'article (BibTeX / LaTeX)
 ```latex
 @article{{cle_citation,
-title={{{destination.stem}}},
-author={{Nom_Auteur, Initiale.}},
-journal={{Nom_du_Journal}},
-year={{Année}}
-}}
+    title={{{destination.stem}}},
+    author={{Nom_Auteur, Initiale.}},
+    journal={{Nom_du_Journal}},
+    year={{Année}}
+}}\   
 """
 
         if template_file.exists():
