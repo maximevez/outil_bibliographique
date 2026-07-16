@@ -20,7 +20,21 @@ class ApplicationUI:
         # --- En-tête ---
         header_frame = ttk.Frame(self.root, padding=10)
         header_frame.pack(fill=tk.X)
+        # --- Barre de recherche ---
+        search_frame = ttk.Frame(self.root, padding=(10, 0, 10, 10))
+        search_frame.pack(fill=tk.X)
         
+        ttk.Label(search_frame, text="🔍 Mot-clé :").pack(side=tk.LEFT)
+        self.search_var = tk.StringVar()
+        search_entry = ttk.Entry(search_frame, textvariable=self.search_var, width=30)
+        search_entry.pack(side=tk.LEFT, padx=5)
+        
+        # Permet de lancer la recherche en appuyant sur "Entrée" sur le clavier
+        search_entry.bind('<Return>', lambda e: self.lancer_recherche())
+        
+        ttk.Button(search_frame, text="Rechercher", command=self.lancer_recherche).pack(side=tk.LEFT, padx=2)
+        ttk.Button(search_frame, text="❌ Annuler", command=self.annuler_recherche).pack(side=tk.LEFT, padx=2)
+
         ttk.Label(header_frame, text="Ma Bibliothèque", font=("Arial", 16, "bold")).pack(side=tk.LEFT)
         ttk.Button(header_frame, text="Synchroniser (Git)", command=self.sync_git).pack(side=tk.RIGHT)
         
@@ -192,3 +206,34 @@ class ApplicationUI:
             if self.file_mgr.move_item(str(chemin_source), dossier_dest):
                 self.git_mgr.commit_all(f"Déplacement de {chemin_source.name}")
                 self.rafraichir_liste()
+    
+    def lancer_recherche(self):
+        mot_cle = self.search_var.get().strip()
+        
+        # Si la barre est vide, on recharge l'arborescence normale
+        if not mot_cle:
+            self.rafraichir_liste()
+            return
+            
+        resultats_pdf = self.file_mgr.search_by_keyword(mot_cle)
+        
+        # On vide l'affichage actuel
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+            
+        if not resultats_pdf:
+            self.tree.insert("", "end", text="Aucun article trouvé avec ce mot-clé.", values=("", "info"))
+            return
+            
+        # On affiche les résultats sous forme de liste plate
+        for pdf_path in resultats_pdf:
+            # On récupère le nom du dossier parent pour savoir où l'article est rangé
+            dossier_parent = pdf_path.parent.name
+            texte_affichage = f"📄 {pdf_path.name}  (Dossier : {dossier_parent})"
+            
+            self.tree.insert("", "end", text=texte_affichage, values=(str(pdf_path), "fichier"))
+
+    def annuler_recherche(self):
+        """Vide la barre de recherche et remet l'arborescence des dossiers par défaut."""
+        self.search_var.set("")
+        self.rafraichir_liste()

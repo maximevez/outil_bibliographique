@@ -1,5 +1,6 @@
 import shutil
 from pathlib import Path
+import re
 
 class FileManager:
     def __init__(self, base_path: str):
@@ -124,3 +125,30 @@ class FileManager:
                 shutil.move(str(md_path), str(dest / md_path.name))
                 
         return True
+    
+    def search_by_keyword(self, keyword: str) -> list[Path]:
+        """Cherche un mot-clé uniquement dans la section 'Mots-clés' des fichiers Markdown."""
+        resultats = []
+        keyword = keyword.lower()
+
+        # On utilise rglob pour scanner les .md dans tous les sous-dossiers
+        for md_file in self.articles_path.rglob("*.md"):
+            try:
+                with open(md_file, 'r', encoding='utf-8') as f:
+                    content = f.read()
+
+                # La magie de la Regex : on capture tout ce qui est entre "## Mots-clés" et le prochain "##" (ou la fin du fichier \Z)
+                match = re.search(r'## Mots-clés(.*?)(?:##|\Z)', content, re.DOTALL | re.IGNORECASE)
+
+                if match:
+                    mots_cles_section = match.group(1).lower()
+                    if keyword in mots_cles_section:
+                        # Si on trouve le mot, on récupère le chemin du PDF correspondant
+                        pdf_path = md_file.with_suffix('.pdf')
+                        if pdf_path.exists():
+                            resultats.append(pdf_path)
+                            
+            except Exception as e:
+                print(f"Erreur de lecture pour {md_file}: {e}")
+
+        return resultats
