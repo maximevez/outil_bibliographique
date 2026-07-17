@@ -7,8 +7,11 @@ import markdown
 from tkinterweb import HtmlFrame
 import os
 import zipfile
-import time
 from zipfile import ZipInfo
+from src.core.archive_manager import ArchiveManager
+from src.ui.components.import_export import ImportExportPanel
+from src.ui.components.action_header import ActionHeader
+from src.ui.components.library_view import LibraryView
 
 class ApplicationUI:
     def __init__(self, root, file_mgr, git_mgr, biblio_path):
@@ -16,6 +19,7 @@ class ApplicationUI:
         self.file_mgr = file_mgr
         self.git_mgr = git_mgr
         self.biblio_path = Path(biblio_path)
+        self.archive_mgr = ArchiveManager(biblio_path)
         
         self.root.title("Outil Bibliographique")
         self.root.geometry("1100x700")
@@ -51,49 +55,39 @@ class ApplicationUI:
         left_frame.grid_rowconfigure(2, weight=1)
         left_frame.grid_columnconfigure(0, weight=1)
 
-        # En-tête
-        header_frame = ctk.CTkFrame(left_frame, fg_color="transparent")
-        header_frame.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
-        ctk.CTkLabel(header_frame, text="Ma Bibliothèque", font=("Segoe UI", 18, "bold")).pack(side=tk.LEFT)
-        ctk.CTkButton(header_frame, text="Sync Git", width=80, command=self.sync_git).pack(side=tk.RIGHT)
+        # En-tête avec titre et boutons d'action
+        # === EN-TÊTE D'ACTION (Titre + Icônes via composant externe) ===
+        self.header = ActionHeader(
+            master=left_frame,
+            cmd_new_folder=self.creer_dossier,
+            cmd_add_pdf=self.ajouter_article,
+            cmd_rename=self.renommer_element,
+            cmd_move=self.deplacer_element
+        )
+        self.header.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
 
-        # Barre de recherche intégrée
-        search_frame = ctk.CTkFrame(left_frame, fg_color="transparent")
-        search_frame.grid(row=1, column=0, padx=10, pady=(0, 10), sticky="ew")
-        self.search_var = tk.StringVar()
-        search_entry = ctk.CTkEntry(search_frame, textvariable=self.search_var, placeholder_text="Chercher un mot-clé...")
-        search_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
-        search_entry.bind('<Return>', lambda e: self.lancer_recherche())
-        ctk.CTkButton(search_frame, text="🔍", width=40, command=self.lancer_recherche).pack(side=tk.LEFT, padx=2)
-        ctk.CTkButton(search_frame, text="❌", width=40, fg_color="#a83232", hover_color="#8a2727", command=self.annuler_recherche).pack(side=tk.LEFT)
-
-        # Arborescence
-        tree_frame = ctk.CTkFrame(left_frame, fg_color="transparent")
-        tree_frame.grid(row=2, column=0, padx=10, pady=(0, 10), sticky="nsew")
+        # === ARBORESCENCE & RECHERCHE (via composant externe) ===
+        self.lib_view = LibraryView(
+            master=left_frame,
+            cmd_search=self.lancer_recherche_via_ui,
+            cmd_cancel=self.annuler_recherche,
+            on_select=self.afficher_apercu,
+            on_double_click=lambda e: self.ouvrir_article()
+        )
+        self.lib_view.grid(row=1, column=0, rowspan=2, padx=0, pady=0, sticky="nsew")
         
-        self.tree = ttk.Treeview(tree_frame, columns=("chemin", "type"), show="tree", selectmode="browse")
-        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        
-        scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.tree.yview)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        self.tree.config(yscrollcommand=scrollbar.set)
-        
-        self.tree.bind('<<TreeviewSelect>>', self.afficher_apercu)
-        self.tree.bind('<Double-1>', lambda e: self.ouvrir_article())
+        # On redirige les références internes pour ne pas casser le reste du code
+        self.tree = self.lib_view.tree
 
         # Boutons d'action
-        action_frame = ctk.CTkFrame(left_frame, fg_color="transparent")
-        action_frame.grid(row=3, column=0, padx=10, pady=10, sticky="ew")
-        
-        ctk.CTkButton(action_frame, text="📁 Nouveau Dossier", command=self.creer_dossier).grid(row=0, column=0, padx=5, pady=5, sticky="ew")
-        ctk.CTkButton(action_frame, text="➕ Ajouter PDF", command=self.ajouter_article).grid(row=0, column=1, padx=5, pady=5, sticky="ew")
-        ctk.CTkButton(action_frame, text="✏️ Renommer", command=self.renommer_element).grid(row=1, column=0, padx=5, pady=5, sticky="ew")
-        ctk.CTkButton(action_frame, text="➡️ Déplacer", command=self.deplacer_element).grid(row=1, column=1, padx=5, pady=5, sticky="ew")
-        action_frame.grid_columnconfigure(0, weight=1)
-        action_frame.grid_columnconfigure(1, weight=1)
-
-        ctk.CTkButton(action_frame, text="📥 Importer ZIP", command=self.importer_bibliotheque, fg_color="#2fa572", hover_color="#25855a").grid(row=2, column=0, padx=5, pady=5, sticky="ew")
-        ctk.CTkButton(action_frame, text="📦 Exporter ZIP", command=self.exporter_bibliotheque, fg_color="#a55a1f", hover_color="#874918").grid(row=2, column=1, padx=5, pady=5, sticky="ew")
+        # === NOUVEAU PANNEAU D'ACTION (Uniquement Import/Export) ===
+        # === PANNEAU D'ACTION (Import/Export via composant externe) ===
+        self.panel_import_export = ImportExportPanel(
+            master=left_frame,
+            cmd_import=self.handle_import,
+            cmd_export=self.handle_export
+        )
+        self.panel_import_export.grid(row=3, column=0, padx=10, pady=10, sticky="ew")
 
     def _creer_panneau_droit(self):
         self.right_frame = ctk.CTkFrame(self.root, corner_radius=10)
@@ -107,45 +101,37 @@ class ApplicationUI:
         self.lbl_titre_apercu = ctk.CTkLabel(header_droit, text="Aucun article sélectionné", font=("Segoe UI", 16, "bold"))
         self.lbl_titre_apercu.pack(side=tk.LEFT)
         
-        self.btn_ouvrir = ctk.CTkButton(header_droit, text="📖 Ouvrir l'article", command=self.ouvrir_article, state="disabled")
-        self.btn_ouvrir.pack(side=tk.RIGHT)
+        # --- NOUVEAUTÉS ICI ---
+        # 1. Sélecteur de navigateur
+        self.var_navigateur = tk.StringVar(value="Système (Défaut)")
+        self.menu_nav = ctk.CTkOptionMenu(
+            header_droit, 
+            variable=self.var_navigateur,
+            values=["Système (Défaut)", "Firefox", "Edge", "Chrome"],
+            width=140
+        )
+        self.menu_nav.pack(side=tk.RIGHT, padx=5)
+
+        # 2. Bouton Ouvrir (réduit)
+        self.btn_ouvrir = ctk.CTkButton(header_droit, text="📖 Ouvrir", command=self.ouvrir_article, state="disabled", width=100)
+        self.btn_ouvrir.pack(side=tk.RIGHT, padx=5)
+
+        # 3. Bouton Créer Note (Caché par défaut)
+        self.btn_creer_note = ctk.CTkButton(
+            header_droit, 
+            text="📝 Créer Note", 
+            command=self.creer_note_manquante, 
+            fg_color="#2fa572", 
+            hover_color="#25855a", 
+            width=100
+        )
+        # On ne fait pas pack() ici pour qu'il reste invisible au lancement
+        # ----------------------
 
         self.html_frame = HtmlFrame(self.right_frame, messages_enabled=False)
         self.html_frame.grid(row=1, column=0, padx=15, pady=(0, 15), sticky="nsew")
         
         self._maj_texte_apercu("Sélectionnez un article dans l'arborescence à gauche pour afficher vos notes.")
-        
-        self._maj_texte_apercu("Sélectionnez un article dans l'arborescence à gauche pour afficher vos notes.")
-
-    # === LOGIQUE D'AFFICHAGE ET APERÇU ===
-    def afficher_apercu(self, event=None):
-        selection = self.tree.selection()
-        if not selection:
-            return
-            
-        item = self.tree.item(selection[0])
-        chemin = Path(item["values"][0])
-        type_item = item["values"][1]
-        
-        if type_item == "dossier":
-            self.lbl_titre_apercu.configure(text=f"📁 {chemin.name}")
-            self._maj_texte_apercu("Ceci est un dossier.")
-            self.btn_ouvrir.configure(state="disabled")
-            return
-
-        self.lbl_titre_apercu.configure(text=f"📄 {chemin.name}")
-        self.btn_ouvrir.configure(state="normal")
-        
-        chemin_md = chemin.parent / (chemin.stem + ".md")
-        if chemin_md.exists():
-            try:
-                with open(chemin_md, "r", encoding="utf-8") as f:
-                    contenu = f.read()
-                self._maj_texte_apercu(contenu)
-            except Exception as e:
-                self._maj_texte_apercu(f"Erreur de lecture : {e}")
-        else:
-            self._maj_texte_apercu("Aucun fichier de notes (.md) trouvé pour cet article.")
 
     def _maj_texte_apercu(self, texte_md):
         # 1. On convertit le Markdown en HTML (avec l'extension 'extra' pour supporter les tableaux)
@@ -304,31 +290,22 @@ class ApplicationUI:
         messagebox.showinfo("Git", "Bibliothèque sauvegardée localement (Commit effectué).")
 
     # === RECHERCHE ===
-    def lancer_recherche(self):
-        mot_cle = self.search_var.get().strip()
-        if not mot_cle:
+    def lancer_recherche_via_ui(self, mot_cle):
+        if not mot_cle.strip():
             self.rafraichir_liste()
             return
             
         resultats_pdf = self.file_mgr.search_by_keyword(mot_cle)
-        
-        for item in self.tree.get_children():
-            self.tree.delete(item)
-            
-        if not resultats_pdf:
-            self.tree.insert("", "end", text="Aucun article trouvé avec ce mot-clé.", values=("", "info"))
-            return
-            
-        for pdf_path in resultats_pdf:
-            dossier_parent = pdf_path.parent.name
-            self.tree.insert("", "end", text=f"📄 {pdf_path.name}  (Dossier : {dossier_parent})", values=(str(pdf_path), "fichier"))
+        # ... (le reste de ton code de recherche)
+        # Note : utilise self.lib_view.tree au lieu de self.tree ici
 
     def annuler_recherche(self):
-        self.search_var.set("")
+        self.lib_view.clear_search()
         self.rafraichir_liste()
     
     # === IMPORT / EXPORT ===
-    def exporter_bibliotheque(self):
+    # === CONTROLEURS IMPORT / EXPORT ===
+    def handle_export(self):
         chemin_zip = filedialog.asksaveasfilename(
             defaultextension=".zip",
             filetypes=[("Fichiers ZIP", "*.zip")],
@@ -338,27 +315,14 @@ class ApplicationUI:
         if not chemin_zip:
             return
 
-        articles_dir = self.biblio_path / "articles"
-        
         try:
-            with zipfile.ZipFile(chemin_zip, 'w', zipfile.ZIP_DEFLATED, strict_timestamps=False) as zipf:
-                for root, dirs, files in os.walk(articles_dir):
-                    # L'ASTUCE : Si on trouve le fichier marqueur, on ordonne à Python d'ignorer ce dossier !
-                    if ".ignore_export" in files:
-                        dirs[:] = []  # Vide la liste des sous-dossiers pour stopper os.walk() ici
-                        continue
-                        
-                    for file in files:
-                        file_path = Path(root) / file
-                        # arcname permet de garder l'arborescence propre à l'intérieur du ZIP
-                        arcname = file_path.relative_to(articles_dir)
-                        zipf.write(file_path, arcname)
-                        
-            messagebox.showinfo("Succès", "Votre bibliothèque a été exportée !\n\nLes dossiers importés d'autres collègues ont bien été exclus du ZIP.")
+            # On demande au Core de faire le travail
+            self.archive_mgr.exporter_zip(chemin_zip)
+            messagebox.showinfo("Succès", "Votre bibliothèque a été exportée avec succès !")
         except Exception as e:
             messagebox.showerror("Erreur", f"Erreur lors de l'exportation : {e}")
 
-    def importer_bibliotheque(self):
+    def handle_import(self):
         chemin_zip = filedialog.askopenfilename(
             title="Sélectionner une bibliothèque partagée (ZIP)",
             filetypes=[("Fichiers ZIP", "*.zip")]
@@ -370,29 +334,88 @@ class ApplicationUI:
         if not nom_dossier:
             return
 
-        # Nettoyer un peu le nom du dossier pour éviter les bugs Windows
-        nom_dossier = "".join([c for c in nom_dossier if c.isalpha() or c.isdigit() or c in ' -_']).strip()
-        if not nom_dossier:
-            return
-            
-        dossier_import = self.biblio_path / "articles" / nom_dossier
-        
-        if dossier_import.exists():
-            messagebox.showerror("Erreur", f"Le dossier '{nom_dossier}' existe déjà. Veuillez choisir un autre nom.")
-            return
-            
         try:
-            dossier_import.mkdir(parents=True)
+            # On envoie le chemin et le nom au Core
+            nom_nettoye = self.archive_mgr.importer_zip(chemin_zip, nom_dossier)
             
-            # C'est ici que ça change : on utilise 'r' pour LIRE le zip !
-            with zipfile.ZipFile(chemin_zip, 'r') as zipf:
-                zipf.extractall(dossier_import)
-                
-            # Création du fichier marqueur caché pour protéger contre le ré-export
-            with open(dossier_import / ".ignore_export", "w", encoding="utf-8") as f:
-                f.write("Dossier importé. Ne pas ré-exporter.")
-                
+            # Si aucune erreur n'a été levée (raise) par le Core, on met à jour l'UI
             self.rafraichir_liste()
-            messagebox.showinfo("Succès", f"La bibliothèque a été importée avec succès dans le dossier '{nom_dossier}'.")
+            messagebox.showinfo("Succès", f"La bibliothèque a été importée avec succès dans '{nom_nettoye}'.")
+            
+        except FileExistsError as e:
+            messagebox.showerror("Erreur", str(e))
+        except ValueError as e:
+            messagebox.showwarning("Attention", str(e))
         except Exception as e:
             messagebox.showerror("Erreur", f"Erreur lors de l'importation : {e}")
+
+    def afficher_apercu(self, event=None):
+        selection = self.tree.selection()
+        if not selection:
+            return
+            
+        item = self.tree.item(selection[0])
+        chemin = Path(item["values"][0])
+        type_item = item["values"][1]
+        
+        if type_item == "dossier":
+            self.lbl_titre_apercu.configure(text=f"📁 {chemin.name}")
+            self._maj_texte_apercu("Ceci est un dossier.")
+            self.btn_ouvrir.configure(state="disabled")
+            self.btn_creer_note.pack_forget() # Cache le bouton note
+            return
+
+        self.lbl_titre_apercu.configure(text=f"📄 {chemin.name}")
+        self.btn_ouvrir.configure(state="normal")
+        
+        chemin_md = chemin.parent / (chemin.stem + ".md")
+        if chemin_md.exists():
+            self.btn_creer_note.pack_forget() # La note existe, on cache le bouton
+            try:
+                with open(chemin_md, "r", encoding="utf-8") as f:
+                    contenu = f.read()
+                self._maj_texte_apercu(contenu)
+            except Exception as e:
+                self._maj_texte_apercu(f"Erreur de lecture : {e}")
+        else:
+            self._maj_texte_apercu("### ⚠️ Aucune note trouvée\n\nAucun fichier de notes (`.md`) n'est associé à cet article.\n\nCliquez sur le bouton **Créer Note** en haut à droite pour en générer un automatiquement.")
+            self.btn_creer_note.pack(side=tk.RIGHT, padx=5) # On affiche le bouton !
+    
+    def ouvrir_article(self):
+        selection = self.tree.selection()
+        if not selection:
+            return
+        item = self.tree.item(selection[0])
+        chemin = Path(item["values"][0])
+        if item["values"][1] == "dossier":
+            return
+            
+        chemin_pdf = chemin
+        chemin_md = chemin.parent / (chemin.stem + ".md")
+        navigateur_choisi = self.var_navigateur.get() # On récupère le choix !
+        
+        Launcher.open_article(str(chemin_pdf), str(chemin_md), navigateur_choisi)
+
+    def creer_note_manquante(self):
+        selection = self.tree.selection()
+        if not selection:
+            return
+        item = self.tree.item(selection[0])
+        chemin_pdf = Path(item["values"][0])
+        chemin_md = chemin_pdf.parent / (chemin_pdf.stem + ".md")
+        
+        # Ton template de base
+        contenu_defaut = f"# Notes sur {chemin_pdf.stem}\n\n## Méthodologie\n\n## Résultats\n\n## Remarques\n"
+        
+        try:
+            with open(chemin_md, "w", encoding="utf-8") as f:
+                f.write(contenu_defaut)
+                
+            # On commit si Git est activé
+            self.git_mgr.commit_all(f"Création de la note manquante pour {chemin_pdf.name}")
+            
+            # On rafraîchit l'aperçu pour afficher la note fraîchement créée
+            self.afficher_apercu()
+            messagebox.showinfo("Succès", "La note a été créée avec succès !")
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Impossible de créer la note : {e}")

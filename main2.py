@@ -7,8 +7,10 @@ from pathlib import Path
 
 from src.core.file_manager import FileManager
 from src.core.git_manager import GitManager
-#from src.ui.fenetre_principale import ApplicationUI
-from src.ui.controller import AppController
+
+import sys
+from PyQt6.QtWidgets import QApplication
+from src.ui2.controller import AppController
 
 # Le fichier de configuration sera créé à côté de l'exécutable/script
 FICHIER_CONFIG = Path("config.json")
@@ -57,24 +59,41 @@ def obtenir_chemin_biblio() -> Path:
     return chemin_complet
 
 def main():
-    # 1. On récupère le chemin dynamiquement (via config ou dialogue)
     biblio_path = obtenir_chemin_biblio()
-    
-    # 2. Initialisation du moteur
-    file_mgr = FileManager(biblio_path)
-    file_mgr.setup_directories()
+    if not biblio_path:
+        print("Installation annulée.")
+        return
+        
     git_mgr = GitManager(biblio_path)
+    file_mgr = FileManager(biblio_path)
+
+    # Lancement du moteur PyQt6
+    app = QApplication(sys.argv)
     
-    # 3. Configuration du design moderne
-    ctk.set_appearance_mode("Dark")
-    ctk.set_default_color_theme("blue")
+    # Injection d'un CSS global pour obtenir le style "CustomTkinter / Mode Sombre"
+    app.setStyle("Fusion")
+    dark_stylesheet = """
+    QWidget { background-color: #2b2b2b; color: #e0e0e0; font-family: 'Segoe UI'; font-size: 11pt; }
+    QTreeWidget { background-color: #1e1e1e; border: 1px solid #343638; border-radius: 5px; outline: none; }
+    QTreeWidget::item { padding: 4px; }
+    QTreeWidget::item:selected { background-color: #1f538d; color: white; }
+    QPushButton { background-color: #343638; border: 1px solid #444648; border-radius: 5px; padding: 6px 12px; }
+    QPushButton:hover { background-color: #444648; }
+    QPushButton:disabled { background-color: #222222; color: #555555; border: none; }
+    QLineEdit { background-color: #1e1e1e; border: 1px solid #343638; border-radius: 5px; padding: 6px; }
+    QTextBrowser { background-color: #1e1e1e; border: 1px solid #343638; border-radius: 5px; }
+    QComboBox { background-color: #343638; border: 1px solid #444648; border-radius: 5px; padding: 5px; }
+    QSplitter::handle { background-color: #343638; width: 4px; }
+    QMessageBox { background-color: #2b2b2b; }
+    """
+    app.setStyleSheet(dark_stylesheet)
     
-    # 4. Lancement de l'interface principale
-    root = ctk.CTk()
-    # On lance l'application via le Contrôleur
-    app = AppController(root, file_mgr, git_mgr, biblio_path)
+    # On remarque que l'on ne passe plus "root" au controller !
+    controller = AppController(file_mgr, git_mgr, biblio_path)
+    controller.view.show()
     
-    root.mainloop()
+    # Boucle principale d'application
+    sys.exit(app.exec())
 
 if __name__ == "__main__":
     main()
