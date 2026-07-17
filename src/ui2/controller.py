@@ -5,6 +5,11 @@ from src.core.launcher import Launcher
 from src.core.archive_manager import ArchiveManager
 from src.ui2.main_window import MainWindow
 import shutil
+import mdx_math  # Ajouté spécialement pour forcer PyInstaller à l'embarquer
+import markdown.extensions.fenced_code
+import markdown.extensions.nl2br
+import markdown.extensions.extra
+import markdown.extensions.tables
 
 class AppController:
     def __init__(self, file_mgr, git_mgr, biblio_path):
