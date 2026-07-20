@@ -9,9 +9,9 @@ import os
 import zipfile
 from zipfile import ZipInfo
 from src.core.archive_manager import ArchiveManager
-from src.ui.components.import_export import ImportExportPanel
-from src.ui.components.action_header import ActionHeader
-from src.ui.components.library_view import LibraryView
+from poubelle.ui.components.import_export import ImportExportPanel
+from poubelle.ui.components.action_header import ActionHeader
+from poubelle.ui.components.library_view import LibraryView
 
 class ApplicationUI:
     def __init__(self, root, file_mgr, git_mgr, biblio_path):

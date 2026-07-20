@@ -1,0 +1,8 @@
+Pour generer un .exe : 
+pyinstaller --noconsole --onefile --name "Outil_Bibliographique" --icon="assets/logo.ico" main.py
+pyinstaller --onefile --windowed --hidden-import mdx_math --add-data "assets;assets" main2.py
+version finale :
+pyinstaller --noconsole --onefile --name "Outil_Bibliographique" --icon="assets/logo.ico" --hidden-import mdx_math --add-data "assets;assets" main2.py
+
+pour optimiser :
+pyinstaller --noconsole --onefile --name "Outil_Bibliographique" --icon="assets/logo.ico" --hidden-import mdx_math --exclude-module tkinter --exclude-module tk --add-data "assets;assets" main2.py

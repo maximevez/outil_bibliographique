@@ -10,6 +10,7 @@ import markdown.extensions.fenced_code
 import markdown.extensions.nl2br
 import markdown.extensions.extra
 import markdown.extensions.tables
+from PyQt6.QtCore import QUrl
 
 class AppController:
     def __init__(self, file_mgr, git_mgr, biblio_path):
@@ -17,12 +18,43 @@ class AppController:
         self.git_mgr = git_mgr
         self.biblio_path = Path(biblio_path)
         self.archive_mgr = ArchiveManager(biblio_path)
+        self.fichier_actuellement_ouvert = None
         
         self.view = MainWindow(self)
         self.rafraichir_liste()
         self._maj_texte_apercu("Sélectionnez un article dans l'arborescence à gauche pour afficher vos notes.")
 
     def afficher_apercu(self):
+        # 1. On récupère la sélection
+        items = self.view.lib_view.tree.selectedItems()
+        if not items:
+            return 
+            
+        item = items[0]
+        
+        # 2. On définit BIEN nos variables (c'est ce qui manquait !)
+        chemin_pdf = Path(item.text(1)) 
+        type_item = item.text(2) 
+        
+        # 3. Le système anti-rechargement (Instantané)
+        if chemin_pdf == self.fichier_actuellement_ouvert:
+            return
+            
+        self.fichier_actuellement_ouvert = chemin_pdf
+        
+        # 4. Le chargement du PDF
+        if type_item != "dossier" and chemin_pdf.suffix.lower() == ".pdf":
+            
+            # On récupère le vrai chemin Windows
+            chemin_absolu = str(chemin_pdf.resolve())
+            
+            # PyQt crée la bonne URL
+            url_locale = QUrl.fromLocalFile(chemin_absolu)
+            
+            # On charge le PDF
+            self.view.pdf_viewer.load(url_locale)
+            
+
         items = self.view.lib_view.tree.selectedItems()
         if not items: return
         item = items[0]
@@ -89,10 +121,13 @@ class AppController:
         self.view.charger_html(page_complete)
 
     def rafraichir_liste(self):
+        self.view.lib_view.tree.setUpdatesEnabled(False)
         self.view.lib_view.tree.clear()
         articles_dir = self.biblio_path / "articles"
         if not articles_dir.exists(): return
         self._peupler_arbre(self.view.lib_view.tree.invisibleRootItem(), articles_dir)
+        self.view.lib_view.tree.collapseAll()  
+        self.view.lib_view.tree.setUpdatesEnabled(True) 
 
     def _peupler_arbre(self, parent_item, chemin_dossier):
         chemins = sorted(chemin_dossier.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower()))

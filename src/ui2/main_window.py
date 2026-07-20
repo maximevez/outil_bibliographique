@@ -6,6 +6,8 @@ from PyQt6.QtCore import Qt
 from src.ui2.components.action_header import ActionHeader
 from src.ui2.components.library_view import LibraryView
 from src.ui2.components.import_export import ImportExportPanel
+from PyQt6.QtWebEngineWidgets import QWebEngineView
+from PyQt6.QtWebEngineCore import QWebEngineSettings # <-- Indispensable pour lire les PDF
 
 class MainWindow(QMainWindow):
     def __init__(self, ctrl):
@@ -65,8 +67,28 @@ class MainWindow(QMainWindow):
 
         # Le widget natif QTextBrowser remplace tkinterweb
         # Le puissant moteur basé sur Chromium
+        # Création du séparateur (coulissant de gauche à droite)
+        self.split_droit = QSplitter(Qt.Orientation.Horizontal)
+        
+        # 1er écran : Le lecteur PDF
+        self.pdf_viewer = QWebEngineView()
+        settings = self.pdf_viewer.settings()
+        settings.setAttribute(QWebEngineSettings.WebAttribute.PdfViewerEnabled, True)
+        settings.setAttribute(QWebEngineSettings.WebAttribute.PluginsEnabled, True) # <-- Indispensable !
+        settings.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessFileUrls, True) # Autorise la lecture sur ton disque dur
+        
+        # 2ème écran : Ton lecteur Markdown actuel
         self.html_frame = QWebEngineView()
-        right_layout.addWidget(self.html_frame)
+
+        # On ajoute les deux écrans au séparateur
+        self.split_droit.addWidget(self.pdf_viewer)
+        self.split_droit.addWidget(self.html_frame)
+        
+        # On donne plus de place au PDF par défaut (ex: 60% PDF, 40% Notes)
+        self.split_droit.setSizes([600, 400])
+
+        # On ajoute le tout au layout de droite
+        right_layout.addWidget(self.split_droit)
 
         splitter.addWidget(left_widget)
         splitter.addWidget(right_widget)

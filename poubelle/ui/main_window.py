@@ -2,9 +2,9 @@ import tkinter as tk
 from tkinter import ttk
 import customtkinter as ctk
 from tkinterweb import HtmlFrame
-from src.ui.components.action_header import ActionHeader
-from src.ui.components.library_view import LibraryView
-from src.ui.components.import_export import ImportExportPanel
+from poubelle.ui.components.action_header import ActionHeader
+from poubelle.ui.components.library_view import LibraryView
+from poubelle.ui.components.import_export import ImportExportPanel
 
 class MainWindow:
     def __init__(self, root, ctrl):
